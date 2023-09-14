@@ -11,6 +11,12 @@ provider "aws" {
   # Configuration options
 }
 
+module "rede_prototipo" {
+  source      = "./modules/rede"
+  vpc_cidr    = "10.1.0.0/16"
+  subnet_cidr = "10.1.1.0/24"
+}
+
 resource "aws_ecs_cluster" "cluster" {
   name = "mentoria-teste"
 }
@@ -27,46 +33,11 @@ resource "aws_ecs_cluster_capacity_providers" "example" {
   }
 }
 
-resource "aws_vpc" "main" {
-  cidr_block = "10.0.0.0/16"
-}
 
-resource "aws_route" "internet_gateway" {
-  route_table_id         = aws_vpc.main.default_route_table_id
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.gw.id
-}
 
-resource "aws_internet_gateway" "gw" {
-  vpc_id = aws_vpc.main.id
-}
 
-resource "aws_security_group" "ecs" {
-  name   = "ecs-teste"
-  vpc_id = aws_vpc.main.id
 
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
-  }
-}
 
 resource "aws_ecs_task_definition" "service" {
   family                   = "sample-fargate"
@@ -101,18 +72,14 @@ resource "aws_ecs_task_definition" "service" {
 
 resource "aws_ecs_service" "apache" {
   name            = "apache"
-  cluster         = aws_ecs_cluster.test.id
+  cluster         = aws_ecs_cluster.cluster.id
   task_definition = aws_ecs_task_definition.service.arn
   desired_count   = 1
   launch_type     = "FARGATE"
   network_configuration {
-    subnets = [aws_subnet.ecs.id]
+    subnets          = [module.rede_prototipo.subnet_id]
+    assign_public_ip = true
+    security_groups  = [module.rede_prototipo.security_group_id]
   }
-}
-
-resource "aws_subnet" "ecs" {
-  vpc_id     = aws_vpc.main.id
-  cidr_block = "10.0.1.0/24"
-
 }
 
