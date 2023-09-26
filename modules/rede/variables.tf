@@ -4,9 +4,7 @@ variable "vpc_cidr" {
   type        = string
 }
 
-variable "subnet_cidr" {
-  description = "Bloco cidr da VPC"
-  default     = "10.0.1.0/24"
-  type        = string
-
+variable "subnets" {
+  type    = map(string)
+  default = {}
 }

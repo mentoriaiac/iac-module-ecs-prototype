@@ -1,5 +1,5 @@
 output "subnet_id" {
-  value = aws_subnet.ecs.id
+  value = { for k, v in aws_subnet.ecs : k => v.id }
 }
 
 output "security_group_id" {
