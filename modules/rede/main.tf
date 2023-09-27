@@ -13,9 +13,9 @@ resource "aws_internet_gateway" "gw" {
 }
 
 resource "aws_subnet" "ecs" {
+  for_each   = var.subnets
   vpc_id     = aws_vpc.main.id
-  cidr_block = var.subnet_cidr
-
+  cidr_block = each.value
 }
 
 resource "aws_security_group" "ecs" {
