@@ -12,14 +12,13 @@ resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.main.id
 }
 
-resource "aws_subnet" "ecs" {
+resource "aws_subnet" "subnets" {
   for_each   = var.subnets
   vpc_id     = aws_vpc.main.id
   cidr_block = each.value
 }
 
-resource "aws_security_group" "ecs" {
-  name   = "ecs-teste"
+resource "aws_security_group" "sg" {
   vpc_id = aws_vpc.main.id
 
   dynamic "ingress" {
@@ -32,11 +31,14 @@ resource "aws_security_group" "ecs" {
     }
   }
 
-  egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
+  dynamic "egress" {
+    for_each = var.egress_rules
+    content {
+      from_port        = egress.value.from_port
+      to_port          = egress.value.to_port
+      protocol         = egress.value.protocol
+      cidr_blocks      = egress.value.cidr_blocks
+      ipv6_cidr_blocks = egress.value.ipv6_cidr_blocks
+    }
   }
 }
