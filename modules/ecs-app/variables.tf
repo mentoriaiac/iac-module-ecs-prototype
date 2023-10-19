@@ -29,4 +29,8 @@ variable "resources" {
 variable "container_definitions" {
   type = string
 }
+
+variable "target_group_arn" {
+  type = string
+}
   

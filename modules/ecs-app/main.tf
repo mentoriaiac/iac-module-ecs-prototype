@@ -8,6 +8,11 @@ resource "aws_ecs_service" "service" {
     subnets          = var.subnets
     assign_public_ip = true
     security_groups  = var.security_groups
+  } 
+    load_balancer {
+    target_group_arn = var.target_group_arn
+    container_name   = "fargate-app"
+    container_port   = 80
   }
 }
 
