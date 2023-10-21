@@ -1,7 +1,9 @@
 output "subnet_id" {
-  value = { for k, v in aws_subnet.ecs : k => v.id }
+  description = "Ids das subnets"
+  value       = { for k, v in aws_subnet.subnets : k => v.id }
 }
 
 output "security_group_id" {
-  value = aws_security_group.ecs.id
+  description = "Id do security group"
+  value       = aws_security_group.sg.id
 }
