@@ -4,12 +4,14 @@ resource "aws_ecs_service" "service" {
   task_definition = aws_ecs_task_definition.task.arn
   desired_count   = var.desired_count
   launch_type     = "FARGATE"
+
   network_configuration {
     subnets          = var.subnets
     assign_public_ip = true
     security_groups  = var.security_groups
-  } 
-    load_balancer {
+  }
+
+  load_balancer {
     target_group_arn = var.target_group_arn
     container_name   = "fargate-app"
     container_port   = 80
