@@ -12,13 +12,13 @@ provider "aws" {
   # Configuration options
 }
 
-module "rede_prototipo" {
+module "rede" {
   source   = "./modules/rede"
   vpc_cidr = "10.1.0.0/16"
 
   subnets = {
-    primaria   = "10.1.1.0/24",
-    secundaria = "10.1.2.0/24",
+    primaria   = "10.1.1.0/24"
+    secundaria = "10.1.2.0/24"
   }
 
   ingress_rules = [
@@ -27,19 +27,7 @@ module "rede_prototipo" {
       to_port     = 80
       protocol    = "tcp"
       cidr_blocks = ["0.0.0.0/0"]
-    },
-    {
-      from_port   = 443
-      to_port     = 443
-      protocol    = "tcp"
-      cidr_blocks = ["0.0.0.0/0"]
-    },
-    {
-      from_port   = 3306
-      to_port     = 3306
-      protocol    = "tcp"
-      cidr_blocks = ["0.0.0.0/0"]
-    },
+    }
   ]
 }
 
@@ -49,56 +37,28 @@ module "cluster" {
   name = "mentoria-teste"
 }
 
-module "apache" {
-  source = "./modules/ecs-app"
-
-  name             = "apache"
-  cluster_id       = module.cluster.cluster_id
-  desired_count    = 1
-  subnets          = [module.rede_prototipo.subnet_id.primaria]
-  security_groups  = [module.rede_prototipo.security_group_id]
-  target_group_arn = aws_lb_target_group.apache1.arn
-
-  resources = {
-    cpu    = 256
-    memory = 512
-  }
-
-  container_definitions = <<EOF
-    [
-      {
-        "name": "fargate-app",
-        "image": "public.ecr.aws/docker/library/httpd:latest",
-        "portMappings": [
-          {
-            "containerPort": 80,
-            "hostPort": 80,
-            "protocol": "tcp"
-          }
-        ],
-        "essential": true,
-        "entryPoint": [
-          "sh",
-          "-c"
-        ],
-        "command": [
-          "/bin/sh -c \"echo '<html> <head> <title>Amazon ECS Sample App 1</title> <style>body {margin-top: 40px; background-color: #333;} </style> </head><body> <div style=color:white;text-align:center> <h1>Amazon ECS Sample App 1</h1> <h2>Congratulations!</h2> <p>Your application is now running on a container in Amazon ECS.</p> </div></body></html>' >  /usr/local/apache2/htdocs/index.html && httpd-foreground\""
-        ]
-      }
-    ]
-    EOF
-
+resource "aws_lb_target_group" "maria_quiteria_web" {
+  name        = "maria-quiteria-web"
+  port        = 80
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = module.rede.vpc_id
 }
 
-module "apache2" {
+data "aws_iam_role" "ecs_task_execution_role" {
+  name = "ecsTaskExecutionRole"
+}
+
+module "maria_quiteria_web" {
   source = "./modules/ecs-app"
 
-  name             = "apache2"
+  name             = "maria_quiteria_web"
   cluster_id       = module.cluster.cluster_id
   desired_count    = 1
-  subnets          = [module.rede_prototipo.subnet_id.secundaria]
-  security_groups  = [module.rede_prototipo.security_group_id]
-  target_group_arn = aws_lb_target_group.apache2.arn
+  subnets          = [module.rede.subnet_id.primaria]
+  security_groups  = [module.rede.security_group_id]
+  target_group_arn = aws_lb_target_group.maria_quiteria_web.arn
+  execution_role_arn = data.aws_iam_role.ecs_task_execution_role.arn
 
   resources = {
     cpu    = 256
@@ -109,7 +69,7 @@ module "apache2" {
     [
       {
         "name": "fargate-app",
-        "image": "public.ecr.aws/docker/library/httpd:latest",
+        "image": "laoqui/maria-quiteria:v2",
         "portMappings": [
           {
             "containerPort": 80,
@@ -118,94 +78,57 @@ module "apache2" {
           }
         ],
         "essential": true,
-        "entryPoint": [
-          "sh",
-          "-c"
+        "entryPoint": ["python"],
+        "command": ["manage.py", "runserver", "0.0.0.0:80"],
+        "environment": [
+          { 
+            "name": "DJANGO_CONFIGURATION",
+            "value": "Prod"
+          },
+          { 
+            "name": "DJANGO_SECRET_KEY",
+            "value": "secret"
+          },
+          { 
+            "name": "DJANGO_ALLOWED_HOSTS",
+            "value": "lb-1689168370.us-east-1.elb.amazonaws.com"
+          }
         ],
-        "command": [
-          "/bin/sh -c \"echo '<html> <head> <title>Amazon ECS Sample App 2</title> <style>body {margin-top: 40px; background-color: #333;} </style> </head><body> <div style=color:white;text-align:center> <h1>Amazon ECS Sample App 2</h1> <h2>Congratulations!</h2> <p>Your application is now running on a container in Amazon ECS.</p> </div></body></html>' >  /usr/local/apache2/htdocs/index.html && httpd-foreground\""
-        ]
+        "logConfiguration": {
+          "logDriver": "awslogs",
+          "options": {
+            "awslogs-create-group": "true",
+            "awslogs-group": "maria-quiteria-web",
+            "awslogs-region": "us-east-1",
+            "awslogs-stream-prefix": "maria-quiteria-web",
+            "mode": "non-blocking", 
+            "max-buffer-size": "25m" 
+          }
+        }
       }
     ]
     EOF
-
 }
 
 module "lb" {
   source = "./modules/load-balancer"
 
-  name = "apache"
+  name = "lb"
 
   security_group_ids = [
-    module.rede_prototipo.security_group_id,
+    module.rede.security_group_id,
   ]
 
   subnet_ids = [
-    module.rede_prototipo.subnet_id.primaria,
-    module.rede_prototipo.subnet_id.secundaria,
+    module.rede.subnet_id.primaria,
+    module.rede.subnet_id.secundaria,
   ]
 
   listeners = {
     http = {
       port                     = "80"
       protocol                 = "HTTP"
-      default_target_group_arn = aws_lb_target_group.apache1.arn
-    },
-    https = {
-      port                     = "443"
-      protocol                 = "HTTP"
-      default_target_group_arn = aws_lb_target_group.apache1.arn
+      default_target_group_arn = aws_lb_target_group.maria_quiteria_web.arn
     },
   }
-}
-
-
-resource "aws_lb_listener_rule" "apache1" {
-  listener_arn = module.lb.listener_arns["http"]
-  priority     = 100
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.apache1.arn
-  }
-
-  condition {
-    query_string {
-      key   = "apache"
-      value = "1"
-    }
-  }
-}
-
-resource "aws_lb_listener_rule" "apache2" {
-  listener_arn = module.lb.listener_arns["http"]
-  priority     = 101
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.apache2.arn
-  }
-
-  condition {
-    query_string {
-      key   = "apache"
-      value = "2"
-    }
-  }
-}
-
-resource "aws_lb_target_group" "apache1" {
-  name        = "apache1"
-  port        = 80
-  protocol    = "HTTP"
-  target_type = "ip"
-  vpc_id      = module.rede_prototipo.vpc_id
-}
-
-resource "aws_lb_target_group" "apache2" {
-  name        = "apache2"
-  port        = 80
-  protocol    = "HTTP"
-  target_type = "ip"
-  vpc_id      = module.rede_prototipo.vpc_id
 }

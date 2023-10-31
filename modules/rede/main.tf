@@ -1,5 +1,11 @@
+terraform {
+  experiments = [module_variable_optional_attrs]
+  #required_version = ">= 1.3.0"
+}
+
 resource "aws_vpc" "main" {
   cidr_block = var.vpc_cidr
+  enable_dns_hostnames = true
 }
 
 resource "aws_route" "internet_gateway" {

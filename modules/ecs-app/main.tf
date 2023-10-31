@@ -25,4 +25,5 @@ resource "aws_ecs_task_definition" "task" {
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   container_definitions    = var.container_definitions
+  execution_role_arn       = var.execution_role_arn
 }
