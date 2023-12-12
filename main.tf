@@ -12,6 +12,10 @@ provider "aws" {
   # Configuration options
 }
 
+resource "aws_eip" "ip_nat_gw" {
+  domain   = "vpc"
+}
+
 module "rede" {
   source   = "./modules/rede"
   vpc_cidr = "10.1.0.0/16"
@@ -25,6 +29,12 @@ module "rede" {
     {
       from_port   = 80
       to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    },
+    {
+      from_port   = 5432
+      to_port     = 5432
       protocol    = "tcp"
       cidr_blocks = ["0.0.0.0/0"]
     }
@@ -105,10 +115,6 @@ load_balancer = {
           { 
             "name": "DJANGO_ALLOWED_HOSTS",
             "value": "${module.lb.lb_dns_name}"
-          },
-          { 
-            "name": "DATABASE_URL",
-            "value": "postgres://postgres:postgres@${module.lb.lb_dns_name}:5432/mariaquiteria"
           }
         ],
         "logConfiguration": {
@@ -136,6 +142,7 @@ module "maria_quiteria_db" {
   subnets          = [module.rede.subnet_id.primaria]
   security_groups  = [module.rede.security_group_id]
   execution_role_arn = data.aws_iam_role.ecs_task_execution_role.arn
+  assign_public_ip = false
 
   resources = {
     cpu    = 256
@@ -152,7 +159,7 @@ module "maria_quiteria_db" {
     [
       {
         "name": "mariaquiteria-db",
-        "image": "library/postgres:11-alpine",
+        "image": "public.ecr.aws/docker/library/postgres:11.22-bullseye",
         "portMappings": [
           {
             "containerPort": 5432,
@@ -195,6 +202,8 @@ module "lb" {
   source = "./modules/load-balancer"
 
   name = "lb"
+  type = "application"
+  internal = false
 
   security_group_ids = [
     module.rede.security_group_id,
@@ -210,10 +219,30 @@ module "lb" {
       port                     = "80"
       protocol                 = "HTTP"
       default_target_group_arn = aws_lb_target_group.maria_quiteria_web.arn
-    },
-    postgres = {
-      port = "5432"
-      protocol = "TCP"
+    }
+  }
+}
+
+module "lb_internal" {
+  source = "./modules/load-balancer"
+
+  name = "lb-internal"
+  type = "network"
+  internal = true
+
+  security_group_ids = [
+    module.rede.security_group_id,
+  ]
+
+  subnet_ids = [
+    module.rede.subnet_id.primaria,
+    module.rede.subnet_id.secundaria,
+  ]
+
+  listeners = {
+    db = {
+      port                     = "5432"
+      protocol                 = "TCP"
       default_target_group_arn = aws_lb_target_group.maria_quiteria_db.arn
     }
   }
