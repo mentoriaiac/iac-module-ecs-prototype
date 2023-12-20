@@ -3,6 +3,15 @@ variable "name" {
   default = ""
 }
 
+variable "type" {
+  type = string
+}
+
+variable "internal" {
+  type = bool
+  default = true
+}
+
 variable "security_group_ids" {
   type = list(string)
 }

@@ -7,14 +7,18 @@ resource "aws_ecs_service" "service" {
 
   network_configuration {
     subnets          = var.subnets
-    assign_public_ip = true
+    assign_public_ip = var.assign_public_ip
     security_groups  = var.security_groups
   }
 
-  load_balancer {
-    target_group_arn = var.target_group_arn
-    container_name   = "fargate-app"
-    container_port   = 80
+  dynamic "load_balancer" {
+    for_each = toset(var.load_balancer == null ? [] : [var.load_balancer])
+  
+    content {
+      target_group_arn = load_balancer.value.target_group_arn
+      container_name   = load_balancer.value.container_name
+      container_port   = load_balancer.value.container_port
+    }
   }
 }
 
@@ -25,4 +29,5 @@ resource "aws_ecs_task_definition" "task" {
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   container_definitions    = var.container_definitions
+  execution_role_arn       = var.execution_role_arn
 }

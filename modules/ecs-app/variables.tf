@@ -19,6 +19,11 @@ variable "security_groups" {
   type = list(string)
 }
 
+variable "assign_public_ip" {
+  type = bool
+  default = false
+}
+
 variable "resources" {
   type = object({
     cpu    = number
@@ -30,7 +35,16 @@ variable "container_definitions" {
   type = string
 }
 
-variable "target_group_arn" {
+variable "execution_role_arn" {
   type = string
+  default = ""
 }
-  
+
+variable "load_balancer" {
+  type = object({
+    target_group_arn = string
+    container_name = string
+    container_port = number
+  })
+  default = null
+}
